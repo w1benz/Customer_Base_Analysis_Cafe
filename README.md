@@ -1,203 +1,195 @@
-# Customer_Base_Analysis_Cafe
+# Customer Base Analysis - Food Delivery Service "Vsyo.iz.Kafe"
 
-### Dashboard Link: https://datalens.yandex/8763xcv9j7msu
+Analysis of key business metrics for a food delivery service in the city of
+Saransk (Russia), based on a SQL-built dashboard in Yandex DataLens.
 
-This project involved analyzing key business metrics using PostgreSQL queries and visualizing the results in Yandex DataLens. The goal was to track performance trends and identify insights for decision-making.
-
-### Tasks Completed:
-
-**Wrote SQL queries to calculate core metrics:**
-- DAU (Daily Active Users)
-- Conversion Rate
-- Average Purchase Value
-- LTV (Lifetime Value)
-- Retention Rate
-
-Built a DataLens dashboard with interactive visualizations (line charts, tables) to monitor trends.
-Performed time-based analysis (May–June) to detect anomalies and growth patterns.
-
-**Key Insights:**
-- DAU trends: Increasing or declining active users.
-- Conversion anomalies: Spikes or drops in user conversion.
-- Average purchase trends: Changes in spending behavior.
-- Retention dynamics: How well users stick over time.
-- The dashboard provides a clear, actionable overview of business performance.
+**Dashboard:** [Yandex DataLens](https://datalens.yandex/8763xcv9j7msu)
+*(Yandex login required — see screenshots below for a preview)*
 
 ---
 
-## SQL Queries Used in the Project
-**Below are the key PostgreSQL queries I wrote to calculate the business metrics:**
+## 1. Business Context
 
-### DAU - Number of unique daily active users 
-```
-SELECT log_date,
-    COUNT(DISTINCT user_id) AS DAU
-from rest_analytics.cities AS c JOIN rest_analytics.analytics_events AS a
-on c.city_id = a.city_id
-WHERE log_date  BETWEEN '2021-05-01' AND '2021-06-30' AND c.city_id = 6 AND event = 'order'
-GROUP BY log_date
-ORDER BY log_date
-```
+The food delivery service "Vsyo.iz.Kafe". The task: build a
+dashboard reflecting the state of the customer base in the city of Saransk,
+and write an analytical summary based on it for senior management.
+
+**Goals:**
+- Calculate and visualize 5 core business metrics
+- Identify trends, anomalies, and seasonal patterns
+- Provide actionable recommendations based on the findings
+
 ---
-### CR by days
-```
-SELECT log_date,
-    ROUND(COUNT(DISTINCT user_id) FILTER ( WHERE event = 'order' ) / COUNT(DISTINCT user_id)::numeric, 2) AS CR 
-FROM rest_analytics.analytics_events
-WHERE log_date BETWEEN '2021-05-01' AND '2021-06-30' AND city_id = 6 
-GROUP BY log_date
-ORDER BY log_date
-```
+
+## 2. Tech Stack
+
+- **PostgreSQL** — data querying (CTEs, window functions, FILTER clauses)
+- **Yandex DataLens** — dashboard & visualization
+
 ---
-### TOP 3 restaurants by LTV
-```
--- We calculate the commission amount for each order, select orders by date and city
-WITH orders AS
-    (SELECT analytics_events.rest_id,
-            analytics_events.city_id,
-            revenue * commission AS commission_revenue
-     FROM rest_analytics.analytics_events
-     JOIN rest_analytics.cities ON analytics_events.city_id = cities.city_id
-     WHERE revenue IS NOT NULL
-         AND log_date BETWEEN '2021-05-01' AND '2021-06-30'
-         AND city_name = 'Саранск')
-SELECT o.rest_id,
-    chain AS "Network name",
-    type AS "Kitchen type",
-    ROUND(SUM(commission_revenue)::numeric, 2) AS LTV
-FROM orders AS o JOIN rest_analytics.partners AS p
-ON o.rest_id = p.rest_id  AND o.city_id = p.city_id
-GROUP BY 1, 2, 3 
-ORDER BY LTV DESC
-LIMIT 3
-```
+
+## 3. Data Schema
+
+The dataset consists of 5 tables describing user behavior, orders,
+restaurants, and dishes for the food delivery service.
+
+### `analytics_events` — event log (core fact table)
+
+| Field | Description |
+|---|---|
+| `visitor_uuid` | Visitor ID, assigned to any new user regardless of registration |
+| `user_id` | Registered user ID, assigned after account creation |
+| `device_type` | Platform type used to access the product |
+| `city_id` | City the visitor accessed the service from |
+| `age` | User's age group (provided at registration) |
+| `source` | Acquisition channel (ad source) |
+| `first_date` | Date of first visit to the product |
+| `visit_id` | Unique session ID |
+| `event` | Event type (see below) |
+| `datetime` | Event timestamp |
+| `log_date` | Event date |
+| `rest_id` | Restaurant chain ID (for orders, restaurant/dish pages) |
+| `object_id` | Dish ID (for orders, dish pages) |
+| `listing_id` | Dish ID within a listing (recommended dishes feed) |
+| `position` | Dish position within the listing |
+| `order_id` | Unique order ID |
+| `revenue` | Order revenue, RUB (amount the user pays) |
+| `delivery` | Delivery cost, RUB |
+| `commission` | Commission the platform takes from restaurant revenue |
+
+**Event types:** `main_page`, `authorization`, `rest_page`, `object_page`, `order`
+
+### `advertisement_budgets` — daily ad spend by channel
+| Field | Description |
+|---|---|
+| `source` | Ad channel |
+| `date` | Date of spend |
+| `budget` | Daily budget, RUB |
+
+### `partners` — restaurant chains directory
+| Field | Description |
+|---|---|
+| `rest_id` | Restaurant chain ID (can operate in multiple cities) |
+| `chain` | Chain name |
+| `type` | Cuisine type |
+| `city_id` | City |
+| `commission` | Commission rate (%) the platform takes |
+
+### `dishes` — dishes directory
+| Field | Description |
+|---|---|
+| `object_id` | Dish ID |
+| `name` | Dish name |
+| `spicy` | 1 = spicy dish |
+| `fish` | 1 = contains seafood |
+| `meat` | 1 = contains meat |
+| `rest_id` | Restaurant the dish belongs to |
+
+### `cities` — city directory
+| Field | Description |
+|---|---|
+| `city_id` | City ID |
+| `city_name` | City name |
+
 ---
-### LTV calculation for restaurants — most popular dishes
-```
--- We calculate the commission amount for each order, select orders by date and city
-WITH orders AS
-    (SELECT a.rest_id,
-            a.city_id,
-            a.object_id,
-            revenue * commission AS commission_revenue
-     FROM rest_analytics.analytics_events AS a
-     JOIN rest_analytics.cities AS c ON a.city_id = c.city_id
-     WHERE revenue IS NOT NULL
-         AND log_date BETWEEN '2021-05-01' AND '2021-06-30'
-         AND city_name = 'Саранск'), 
--- We calculate the two restaurants with the highest LTV 
-top_ltv_restaurants AS
-    (SELECT o.rest_id,
-            chain,
-            type,
-            ROUND(SUM(commission_revenue)::numeric, 2) AS LTV
-     FROM orders AS o JOIN rest_analytics.partners AS p 
-     ON o.rest_id = p.rest_id AND o.city_id = p.city_id
-     GROUP BY 1, 2, 3
-     ORDER BY LTV DESC
-     LIMIT 2)
-SELECT t.chain AS "Chain name",
-    d.name AS "Dish name",
-    CASE WHEN d.spicy = 1 THEN 1 ELSE 0 END AS spicy,
-    CASE WHEN d.fish = 1 THEN 1 ELSE 0 END AS fish,
-    CASE WHEN d.meat = 1 THEN 1 ELSE 0 END AS meat,
-    ROUND(SUM(o.commission_revenue)::numeric, 2) AS LTV
-FROM top_ltv_restaurants AS t
-JOIN orders AS o ON t.rest_id = o.rest_id
-JOIN rest_analytics.dishes AS d ON o.rest_id = d.rest_id AND o.object_id = d.object_id
-GROUP BY 1, 2, 3, 4, 5
-ORDER By LTV DESC
-```
+
+## 4. Metrics Calculated
+
+| Metric | Definition |
+|---|---|
+| **DAU** | Daily count of registered users who placed an order |
+| **Conversion Rate (CR)** | Share of active registered users who placed an order on a given day |
+| **Average Check** | Platform's average commission revenue per order, by month |
+| **LTV (by restaurant)** | Total commission revenue generated by a restaurant chain over the period |
+| **LTV (by dish)** | Total commission revenue generated by individual dishes, for the top restaurant chains |
+| **Retention Rate** | Share of new users returning to the app on each day of their first week |
+
+SQL implementations: see [`/sql`](./sql) folder.
+
 ---
-### Average check (May - June)
-```
--- We calculate the commission amount for each order, select orders by date and city
-WITH orders AS
-    (SELECT *,
-            revenue * commission AS commission_revenue
-     FROM rest_analytics.analytics_events
-     JOIN rest_analytics.cities ON analytics_events.city_id = cities.city_id
-     WHERE revenue IS NOT NULL
-         AND log_date BETWEEN '2021-05-01' AND '2021-06-30'
-         AND city_name = 'Саранск')
-SELECT 
-    DATE_TRUNC('month', log_date)::date AS "Month",
-    COUNT(DISTINCT order_id) AS "Order count",
-    ROUND(SUM(commission_revenue)::numeric, 2) AS "Commission amount",
-    ROUND(SUM(commission_revenue)::numeric / COUNT(DISTINCT order_id), 2) AS "Average check"
-FROM orders
-GROUP BY 1
-ORDER BY 1
-```
+
+## 5. Key Insights (Saransk)
+
+**DAU**
+Started at a low of 34 users/day in early May, peaked at 85 (May 4). Mid-May
+saw instability, with a low of 17 users (May 16). A second peak of 84 users
+occurred June 11, followed by a declining trend through late June
+(bottoming at 26 users/day, June 26–28). June had a higher overall activity
+floor than May, but the post-June-11 decline suggests a possible seasonal
+or engagement drop-off worth investigating.
+
+**Conversion Rate**
+Peaked early May at 43% (May 1), then fluctuated mostly in the 25–32% range
+through both months. Lowest value was 18% (June 18). May outperformed June
+overall, with two high-conversion days vs. one low-conversion dip in June —
+suggesting a possible decline in purchase intent or funnel friction
+introduced later in the period.
+
+**Average Check**
+Increased by ~11.78 RUB (≈8.7%) from May to June — a positive signal,
+likely driven by higher-value orders or pricing/assortment changes.
+
+**Retention Rate**
+Of 5,572 new users, retention dropped sharply: 14% on day 1 (768 users), 8%
+on day 2, 5% on day 3, stabilizing around 4–5% from day 4–7. The steep
+day-1 drop-off is the single biggest opportunity area — likely driven by
+onboarding friction, lack of early incentives, or competitive pressure.
+
+**Top-3 Restaurants by LTV**
+1. **Gurmanskoe Naslazhdenie** — 170,479 RUB
+2. **Gastronomicheskiy Shtorm** — 164,508 RUB
+3. **Shokoladniy Ray** — 61,200 RUB (≈3x lower than the leader)
+
+The gap between #2 and #3 is much larger than between #1 and #2, suggesting
+the top two chains share something structurally different (menu quality,
+loyalty mechanics) that the rest of the market hasn't matched.
+
+**Top dishes (within top-2 restaurants by LTV):** 4 of the top 5 dishes by
+LTV combine fish and meat — a strong signal on customer dish preference
+that could inform menu strategy for lower-performing chains.
+
 ---
-### Retention Rate comparison by month
-```
--- We calculate new users based on the date of the first visit to the product.
-WITH new_users AS
-    (SELECT DISTINCT first_date,
-                     user_id
-     FROM rest_analytics.analytics_events
-     JOIN rest_analytics.cities ON analytics_events.city_id = cities.city_id
-     WHERE first_date BETWEEN '2021-05-01' AND '2021-06-24'
-         AND city_name = 'Саранск'),
--- Calculate active users by event date
-active_users AS
-    (SELECT DISTINCT log_date,
-                     user_id
-     FROM rest_analytics.analytics_events
-     JOIN rest_analytics.cities ON analytics_events.city_id = cities.city_id
-     WHERE log_date BETWEEN '2021-05-01' AND '2021-06-30'
-         AND city_name = 'Саранск'),
--- Connect tables with new and active users
-daily_retention AS
-    (SELECT new_users.user_id,
-            first_date,
-            log_date::date - first_date::date AS day_since_install
-     FROM new_users
-     JOIN active_users ON new_users.user_id = active_users.user_id
-     AND log_date >= first_date)
-SELECT 
-    DATE_TRUNC('MONTH', first_date)::date AS "Month",
-    day_since_install,
-    COUNT(DISTINCT user_id) AS retained_users,
-    ROUNd(1.0 * COUNT(DISTINCT user_id) / MAX(COUNT(DISTINCT user_id)) OVER (PARTITION BY DATE_TRUNC('MONTH', first_date)::date ORDER by day_since_install), 2) AS retention_rate
-FROM daily_retention
-WHERE day_since_install < 8
-GROUP BY "Month", day_since_install
-ORDER BY "Month", day_since_install
-```
+
+## 6. Recommendations
+
+1. **Fix early retention** — simplify onboarding, introduce push
+   notifications and a first-week incentive/bonus program to reduce the
+   steep day-1 drop-off.
+2. **Stabilize DAU** — investigate the post-June-11 decline; consider
+   targeted promotions or content to reduce volatility.
+3. **Improve conversion** — simplify checkout, expand payment options, and
+   test personalized discounts to lift CR, especially during low-conversion
+   periods.
+4. **Apply top-restaurant learnings** — analyze what drives the top 2
+   chains' LTV (menu mix, pricing, loyalty) and test similar strategies
+   with lower-performing partners.
+
 ---
-### Retention Rate dynamics of new users during the first week
+
+## 7. Dashboard Preview
+
+*(screenshots to be added)*
+
+---
+
+## 8. Repository Structure
+
 ```
--- We calculate new users by the date of the first visit to the product
-WITH new_users AS
-    (SELECT DISTINCT first_date,
-                     user_id
-     FROM rest_analytics.analytics_events
-     JOIN rest_analytics.cities ON analytics_events.city_id = cities.city_id
-     WHERE first_date BETWEEN '2021-05-01' AND '2021-06-24'
-         AND city_name = 'Саранск'),
--- Calculate active users by event date
-active_users AS
-    (SELECT DISTINCT log_date,
-                     user_id
-     FROM rest_analytics.analytics_events
-     JOIN rest_analytics.cities ON analytics_events.city_id = cities.city_id
-     WHERE log_date BETWEEN '2021-05-01' AND '2021-06-30'
-         AND city_name = 'Саранск'),
-daily_retention AS (
-    SELECT n.user_id,
-        first_date,
-        log_date::date - first_date::date AS day_since_install
-    FROM new_users AS n JOIN active_users AS a
-    ON n.user_id = a.user_id
-    WHERE log_date >= first_date
-)
-SELECT day_since_install,
-    COUNT(DISTINCT user_id) AS retained_users,
-    ROUND(1.0 * COUNT(DISTINCT user_id) / MAX(COUNT(DISTINCT user_id)) OVER (ORDER BY day_since_install), 2) AS retention_rate
-FROM daily_retention
-WHERE day_since_install < 8
-GROUP BY day_since_install
-ORDER BY day_since_install
+.
+├── README.md
+└── sql/
+    ├── 01_dau.sql
+    ├── 02_conversion_rate.sql
+    ├── 03_average_check.sql
+    ├── 04_top_ltv_restaurants.sql
+    ├── 05_top_dishes_by_ltv.sql
+    ├── 06_retention_by_month.sql
+    └── 07_retention_first_week.sql
 ```
+
+---
+
+## Author
+
+**Vladislav Wiesner**
+[LinkedIn](#) · [GitHub](https://github.com/w1benz)
