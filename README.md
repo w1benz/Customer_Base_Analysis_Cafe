@@ -4,7 +4,7 @@ Analysis of key business metrics for a food delivery service in the city of
 Saransk (Russia), based on a SQL-built dashboard in Yandex DataLens.
 
 **Dashboard:** [Yandex DataLens](https://datalens.yandex/8763xcv9j7msu)
-*(Yandex login required — see screenshots below for a preview)*
+*(see screenshots below for a preview)*
 
 ---
 
