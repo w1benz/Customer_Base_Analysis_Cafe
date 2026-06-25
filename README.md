@@ -168,7 +168,10 @@ that could inform menu strategy for lower-performing chains.
 
 ## 7. Dashboard Preview
 
-*(screenshots to be added)*
+<img width="1469" height="503" alt="image" src="https://github.com/user-attachments/assets/61c72755-cb13-4cc5-a873-28bd2578cd07" />
+<img width="1470" height="422" alt="image" src="https://github.com/user-attachments/assets/a2fa13a6-6294-4512-9a6a-2f3a55ce87b4" />
+<img width="1470" height="377" alt="image" src="https://github.com/user-attachments/assets/84b263b1-67a4-4dc6-965a-139c273b9cf5" />
+
 
 ---
 
