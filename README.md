@@ -192,4 +192,4 @@ that could inform menu strategy for lower-performing chains.
 ## Author
 
 **Vladislav Wiesner**
-[LinkedIn](www.linkedin.com/in/vladislav-wiesner-317048300) · [GitHub](https://github.com/w1benz)
+[LinkedIn](https://www.linkedin.com/in/vladislav-wiesner-317048300/) · [GitHub](https://github.com/w1benz)
